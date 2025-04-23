@@ -1,3 +1,4 @@
+// Dependency imports
 require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
@@ -5,6 +6,7 @@ const { MongoClient } = require("mongodb");
 const { isWebUri } = require("valid-url");
 const shortid = require("shortid");
 
+// Server setup
 const app = express();
 const port = process.env.PORT || 3000;
 let db;
@@ -15,7 +17,7 @@ app.use(express.json()); // Parse JSON bodies
 app.use(express.urlencoded({ extended: true })); // Parse URL-encoded bodies
 app.use("/public", express.static(`${process.cwd()}/public`));
 
-// MongoDB Connection
+// Database Connection
 async function connectDB() {
   try {
     const client = new MongoClient(process.env.MONGODB_URI);
@@ -27,16 +29,20 @@ async function connectDB() {
     process.exit(1); // Exit if DB connection fails
   }
 }
-connectDB();
+connectDB(); // Call immediately when the server starts
 
-// Routes
+// ---- Routes ----
+
+// Homepage (GET /)
 app.get("/", (req, res) => {
   res.sendFile(`${process.cwd()}/views/index.html`);
 });
 
+// Shorten URL (POST /api/shorturl)
 app.post("/api/shorturl", async (req, res) => {
   const { url } = req.body;
 
+  // Validate URL
   if (!isWebUri(url)) {
     return res.json({ error: "invalid url" });
   }
@@ -54,6 +60,7 @@ app.post("/api/shorturl", async (req, res) => {
   }
 });
 
+// Redirect Short URL (GET /api/shorturl/:short_url)
 app.get("/api/shorturl/:short_url", async (req, res) => {
   try {
     const { short_url } = req.params;
@@ -70,6 +77,7 @@ app.get("/api/shorturl/:short_url", async (req, res) => {
   }
 });
 
+// Server Startup
 app.listen(port, () => {
   console.log(`Server running on port ${port}`);
 });
