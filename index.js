@@ -1,57 +1,38 @@
 require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
-const app = express();
 const { MongoClient } = require("mongodb");
-const client = new MongoClient(process.env.MONGODB_URI);
+const { isWebUri } = require("valid-url");
+const shortid = require("shortid");
+
+const app = express();
+const port = process.env.PORT || 3000;
 let db;
 
-// Basic Configuration
-const port = process.env.PORT || 3000;
-
+// Middleware
 app.use(cors());
+app.use(express.json()); // Parse JSON bodies
+app.use(express.urlencoded({ extended: true })); // Parse URL-encoded bodies
+app.use("/public", express.static(`${process.cwd()}/public`));
 
-// Connect to MongoDB
+// MongoDB Connection
 async function connectDB() {
   try {
+    const client = new MongoClient(process.env.MONGODB_URI);
     await client.connect();
     db = client.db("url_shortener");
     console.log("Connected to MongoDB");
   } catch (err) {
     console.error("MongoDB connection error:", err);
+    process.exit(1); // Exit if DB connection fails
   }
 }
-
-// Call when the server starts
 connectDB();
 
-app.use("/public", express.static(`${process.cwd()}/public`));
-
-app.get("/", function (req, res) {
-  res.sendFile(process.cwd() + "/views/index.html");
+// Routes
+app.get("/", (req, res) => {
+  res.sendFile(`${process.cwd()}/views/index.html`);
 });
-
-// Your first API endpoint
-// app.get("/api/hello", function (req, res) {
-//   res.json({ greeting: "hello API" });
-// });
-
-// URL validation with valid-url
-const { isWebUri } = require("valid-url");
-
-app.post("/api/shorturl", async (req, res) => {
-  const { url } = req.body;
-
-  // Validate URL
-  if (!isWebUri(url)) {
-    return res.json({ error: "invalid url" });
-  }
-
-  res.json({ original_url: url, short_url: 1 }); // Temporary mock
-});
-
-// Generate Short IDs with shortid
-const shortid = require("shortid");
 
 app.post("/api/shorturl", async (req, res) => {
   const { url } = req.body;
@@ -60,26 +41,35 @@ app.post("/api/shorturl", async (req, res) => {
     return res.json({ error: "invalid url" });
   }
 
-  const shortUrl = shortid.generate(); // e.g "abc123"
-  await db
-    .collection("urls")
-    .insertOne({ original_url: url, short_url: shortUrl });
-
-  res.json({ original_url: url, short_url: shortUrl });
-});
-
-// Redirect short urls
-app.get("api/shorturl/:shorturl", async (req, res) => {
-  const { short_url } = req.params;
-  const doc = await db.collection("urls").findOne({ short_url });
-
-  if (doc) {
-    res.redirect(doc.original_url);
-  } else {
-    res.json({ error: "url not found" });
+  try {
+    const shortUrl = shortid.generate();
+    await db.collection("urls").insertOne({
+      original_url: url,
+      short_url: shortUrl,
+    });
+    res.json({ original_url: url, short_url: shortUrl });
+  } catch (err) {
+    console.error("Database error:", err);
+    res.status(500).json({ error: "server error" });
   }
 });
 
-app.listen(port, function () {
-  console.log(`Listening on port ${port}`);
+app.get("/api/shorturl/:short_url", async (req, res) => {
+  try {
+    const { short_url } = req.params;
+    const doc = await db.collection("urls").findOne({ short_url });
+
+    if (doc) {
+      res.redirect(doc.original_url);
+    } else {
+      res.status(404).json({ error: "short url not found" });
+    }
+  } catch (err) {
+    console.error("Redirect error:", err);
+    res.status(500).json({ error: "server error" });
+  }
+});
+
+app.listen(port, () => {
+  console.log(`Server running on port ${port}`);
 });
