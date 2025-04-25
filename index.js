@@ -5,6 +5,7 @@ const cors = require("cors");
 const { MongoClient } = require("mongodb");
 const { isWebUri } = require("valid-url");
 const shortid = require("shortid");
+const path = require("path");
 
 // Server setup
 const app = express();
@@ -15,12 +16,15 @@ let db;
 app.use(cors());
 app.use(express.json()); // Parse JSON bodies
 app.use(express.urlencoded({ extended: true })); // Parse URL-encoded bodies
-app.use("/public", express.static(`${process.cwd()}/public`));
+app.use("/public", express.static(path.join(__dirname, "public")));
 
 // Database Connection
 async function connectDB() {
   try {
-    const client = new MongoClient(process.env.MONGODB_URI);
+    const client = new MongoClient(process.env.MONGODB_URI, {
+      serverSelectionTimeoutMS: 5000,
+      connectTimeoutMS: 10000,
+    });
     await client.connect();
     db = client.db("url_shortener");
     console.log("Connected to MongoDB");
@@ -35,7 +39,7 @@ connectDB(); // Call immediately when the server starts
 
 // Homepage (GET /)
 app.get("/", (req, res) => {
-  res.sendFile(`${process.cwd()}/views/index.html`);
+  res.sendFile(path.join(__dirname, "views", "index.html"));
 });
 
 // Shorten URL (POST /api/shorturl)
@@ -66,11 +70,9 @@ app.get("/api/shorturl/:short_url", async (req, res) => {
     const { short_url } = req.params;
     const doc = await db.collection("urls").findOne({ short_url });
 
-    if (doc) {
-      res.redirect(doc.original_url);
-    } else {
-      res.status(404).json({ error: "short url not found" });
-    }
+    doc
+      ? res.redirect(doc.original_url)
+      : res.status(404).json({ error: "not found" });
   } catch (err) {
     console.error("Redirect error:", err);
     res.status(500).json({ error: "server error" });
