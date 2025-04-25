@@ -11,6 +11,8 @@ const path = require("path");
 const app = express();
 const port = process.env.PORT || 3000;
 let db;
+let dbClient; // Track the client for proper cleanup
+let isDBConnected = false;
 
 // Middleware
 app.use(cors());
@@ -22,18 +24,36 @@ app.use("/public", express.static(path.join(__dirname, "public")));
 async function connectDB() {
   try {
     const client = new MongoClient(process.env.MONGODB_URI, {
-      serverSelectionTimeoutMS: 5000,
-      connectTimeoutMS: 10000,
+      serverSelectionTimeoutMS: 10000,
+      connectTimeoutMS: 30000,
+      socketTimeoutMS: 45000,
+      retryWrites: true,
+      retryReads: true,
+      maxPoolSize: 10,
     });
+
     await client.connect();
     db = client.db("url_shortener");
-    console.log("Connected to MongoDB");
+    dbClient = client; // Store client reference
+    isDBConnected = true;
+    console.log("✅ MongoDB Connected!");
+    return db;
   } catch (err) {
-    console.error("MongoDB connection error:", err);
-    process.exit(1); // Exit if DB connection fails
+    console.error("❌ MongoDB Connection Failed:", err);
+    throw err; // Re-throw to be caught in startup
   }
 }
-connectDB(); // Call immediately when the server starts
+
+// Database Ready Middleware
+app.use((req, res, next) => {
+  if (!isDBConnected) {
+    return res.status(503).json({
+      error: "Service Unavailable",
+      message: "Database initializing. Please try again shortly.",
+    });
+  }
+  next();
+});
 
 // ---- Routes ----
 
@@ -44,11 +64,13 @@ app.get("/", (req, res) => {
 
 // Shorten URL (POST /api/shorturl)
 app.post("/api/shorturl", async (req, res) => {
+  // console.log("Database instance:", !!db); // Verify database connection (Should log "true")
+
   const { url } = req.body;
 
   // Validate URL
   if (!isWebUri(url)) {
-    return res.json({ error: "invalid url" });
+    return res.status(400).json({ error: "invalid url" });
   }
 
   try {
@@ -56,11 +78,12 @@ app.post("/api/shorturl", async (req, res) => {
     await db.collection("urls").insertOne({
       original_url: url,
       short_url: shortUrl,
+      createdAt: new Date(),
     });
     res.json({ original_url: url, short_url: shortUrl });
   } catch (err) {
     console.error("Database error:", err);
-    res.status(500).json({ error: "server error" });
+    res.status(500).json({ error: "server error", message: err.message });
   }
 });
 
@@ -70,16 +93,35 @@ app.get("/api/shorturl/:short_url", async (req, res) => {
     const { short_url } = req.params;
     const doc = await db.collection("urls").findOne({ short_url });
 
-    doc
-      ? res.redirect(doc.original_url)
-      : res.status(404).json({ error: "not found" });
+    if (!doc) {
+      return res.status(404).json({ error: "not found" });
+    }
+
+    res.redirect(doc.original_url);
   } catch (err) {
     console.error("Redirect error:", err);
     res.status(500).json({ error: "server error" });
   }
 });
 
-// Server Startup
-app.listen(port, () => {
-  console.log(`Server running on port ${port}`);
+// Graceful Shutdown Handler
+process.on("SIGTERM", async () => {
+  if (dbClient) {
+    await dbClient.close();
+    console.log("MongoDB connection closed");
+  }
+  process.exit(0);
 });
+
+// Server Startup Sequence
+(async () => {
+  try {
+    await connectDB();
+    app.listen(port, () => {
+      console.log(`🚀 Server running on port ${port}`);
+    });
+  } catch (err) {
+    console.error("💥 Fatal startup error:", err);
+    process.exit(1);
+  }
+})();
