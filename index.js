@@ -64,26 +64,46 @@ app.get("/", (req, res) => {
 
 // Shorten URL (POST /api/shorturl)
 app.post("/api/shorturl", async (req, res) => {
-  // console.log("Database instance:", !!db); // Verify database connection (Should log "true")
-
   const { url } = req.body;
 
-  // Validate URL
+  // ===== 1. Validate URL Format =====
   if (!isWebUri(url)) {
-    return res.status(400).json({ error: "invalid url" });
+    return res.json({ error: "invalid url" });
+  }
+
+  // ===== 2. DNS Lookup Verification =====
+  let hostname;
+  try {
+    // Extract hostname from URL (e.g. "google.com" from "https://google.com/search")
+    hostname = new URL(url).hostname;
+  } catch (err) {
+    return res.json({ error: "invalid url" });
   }
 
   try {
+    // Verify domain exists in real DNS records
+    await require("dns").promises.lookup(hostname);
+  } catch (err) {
+    return res.json({ error: "invalid url" });
+  }
+
+  // ===== 3. Create Short URL =====
+  try {
     const shortUrl = shortid.generate();
+
     await db.collection("urls").insertOne({
       original_url: url,
       short_url: shortUrl,
       createdAt: new Date(),
     });
-    res.json({ original_url: url, short_url: shortUrl });
+
+    res.json({
+      original_url: url,
+      short_url: shortUrl,
+    });
   } catch (err) {
     console.error("Database error:", err);
-    res.status(500).json({ error: "server error", message: err.message });
+    res.status(500).json({ error: "server error" });
   }
 });
 
