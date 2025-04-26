@@ -61,7 +61,8 @@ A high-performance URL shortening service, built with Node.js and MongoDB. Featu
 git clone https://github.com/RaphaelIsaiah/boilerplate-project-urlshortener
 cd boilerplate-project-urlshortener
 npm install
-echo "MONGODB_URI=mongodb+srv://user:pass@cluster.url.mongodb.net/url_shortener" > .env
+# Add your MongoDB URI to a new .env file
+echo "MONGODB_URI=your_connection_string" > .env
 npm start
 ```
 
