@@ -8,7 +8,7 @@
 ![MongoDB](https://img.shields.io/badge/MongoDB-Atlas-teal?logo=mongodb)  
 ![License](https://img.shields.io/badge/License-MIT-teal)
 
-A high-performance URL shortening service with analytics, built with Node.js and MongoDB. Features custom short codes and social media previews.
+A high-performance URL shortening service, built with Node.js and MongoDB. Features custom short codes and social media previews.
 
 ![Demo Screenshot](https://i.postimg.cc/pLwm91Rt/URL-Shortener-Microservice.png)
 
