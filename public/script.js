@@ -63,6 +63,6 @@ document.addEventListener("DOMContentLoaded", () => {
     setTimeout(() => {
       alertBox.classList.add("opacity-0", "transition-opacity", "duration-500");
       setTimeout(() => alertBox.remove(), 500);
-    }, 10000);
+    }, 5000);
   }
 });

@@ -18,6 +18,7 @@ let isDBConnected = false;
 app.use(cors());
 app.use(express.json()); // Parse JSON bodies
 app.use(express.urlencoded({ extended: true })); // Parse URL-encoded bodies
+app.use("/public", express.static(path.join(__dirname, "public")));
 app.use(express.static(path.join(__dirname, "public")));
 
 // Database Connection

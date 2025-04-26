@@ -14,9 +14,6 @@
       "use": "@vercel/static"
     }
   ],
-  "env": {
-    "NODE_ENV": "test"
-  },
   "routes": [
     {
       "src": "/api/(.*)",
@@ -27,7 +24,7 @@
       "dest": "/views/index.html"
     },
     {
-      "src": "/public/(.*)",
+      "src": "/(.*)",
       "dest": "/public/$1"
     }
   ]
