@@ -118,14 +118,48 @@ app.get("/api/shorturl/:short_url", async (req, res) => {
       return res.status(404).json({ error: "not found" });
     }
 
-    res.redirect(doc.original_url);
+    // Check if request is from a social media crawler
+    const isSocialMediaBot =
+      req.headers["user-agent"]?.includes("facebookexternalhit") ||
+      req.headers["user-agent"]?.includes("Twitterbot") ||
+      req.headers["user-agent"]?.includes("LinkedInBot");
+
+    if (isSocialMediaBot) {
+      // Serve HTML with OG tags for social media previews
+      return res.send(`
+  <!DOCTYPE html>
+  <html prefix="og: https://ogp.me/ns#">
+  <head>
+    <title>Short URL: ${short_url}</title>
+    <meta property="og:title" content="Short URL Redirect">
+    <meta property="og:description" content="Redirecting to: ${
+      doc.original_url
+    }">
+    <meta property="og:url" content="${req.protocol}://${req.get(
+        "host"
+      )}/api/shorturl/${short_url}">
+    <meta property="og:image" content="https://i.postimg.cc/xCMm6Vj5/URL-Shortener-Microservice-Large.png">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="URL Shortener Microservice">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta http-equiv="refresh" content="0;url=${doc.original_url}">
+  </head>
+  <body>
+    <p>Redirecting to <a href="${doc.original_url}">${doc.original_url}</a></p>
+  </body>
+  </html>
+`);
+    } else {
+      // Normal user/browser request - redirect immediately
+      return res.redirect(doc.original_url);
+    }
   } catch (err) {
     console.error("Redirect error:", err);
     res.status(500).json({ error: "server error" });
   }
 });
 
-// Graceful Shutdown Handler
+// Shutdown Handler
 process.on("SIGTERM", async () => {
   if (dbClient) {
     await dbClient.close();
