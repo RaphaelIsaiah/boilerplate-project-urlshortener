@@ -50,8 +50,10 @@ document.addEventListener("DOMContentLoaded", () => {
   // Click handler for copy button
   document.addEventListener("click", (e) => {
     if (e.target.classList.contains("copy-btn")) {
+      e.target.classList.add("bg-green-600", "transform", "scale-95");
       e.target.textContent = "Copied!";
       setTimeout(() => {
+        e.target.classList.remove("bg-green-600", "transform", "scale-95");
         e.target.textContent = "Copy";
       }, 2000);
       const outputField = document.getElementById("short-url-output");
